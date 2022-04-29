@@ -6,6 +6,10 @@ import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.sapient.blog.entities.Category;
@@ -13,6 +17,7 @@ import com.sapient.blog.entities.Post;
 import com.sapient.blog.entities.User;
 import com.sapient.blog.exceptions.ResourceNotFoundException;
 import com.sapient.blog.payloads.PostDto;
+import com.sapient.blog.payloads.PostResponse;
 import com.sapient.blog.repositories.CategoryRepo;
 import com.sapient.blog.repositories.PostRepo;
 import com.sapient.blog.repositories.UserRepo;
@@ -76,11 +81,32 @@ public class PostServiceImpl implements PostService {
 	}
 
 	@Override
-	public List<PostDto> getAllPosts() {
+	public PostResponse getAllPosts(Integer pageNumber,Integer pageSize,String sortBy,String sortDir) {
 		
-		List<Post> allPosts=this.postRepo.findAll();
+		Sort sort;
+		
+		if(sortDir.equalsIgnoreCase("asc")) {
+			sort=Sort.by(sortBy).ascending();
+		}else if(sortDir.equalsIgnoreCase("desc")) {
+			sort=Sort.by(sortBy).descending();
+		}else {
+			sort=Sort.by(sortBy).ascending();
+		}
+		
+		Pageable pageable=PageRequest.of(pageNumber, pageSize,sort);
+		
+		Page<Post> pagePost = this.postRepo.findAll(pageable);
+		List<Post> allPosts = pagePost.getContent();
 		List<PostDto> postDtos=allPosts.stream().map((post)->this.modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
-		return postDtos;
+		
+		PostResponse postResponse=new PostResponse();
+		postResponse.setContent(postDtos);
+		postResponse.setPageNumber(pagePost.getNumber());
+		postResponse.setPageSize(pagePost.getSize());
+		postResponse.setTotalPages(pagePost.getTotalPages());
+		postResponse.setTotalRecords(pagePost.getTotalElements());
+		postResponse.setLastPage(pagePost.isLast());
+		return postResponse;
 	}
 
 	@Override
@@ -115,7 +141,10 @@ public class PostServiceImpl implements PostService {
 
 	@Override
 	public List<PostDto> searchPosts(String keyword) {
-		return null;
+		List<Post> posts = this.postRepo.findByTitle("%"+keyword+"%");
+		List<PostDto>postDtos= posts.stream().map((post)->this.modelMapper.map(post,PostDto.class)).collect(Collectors.toList());
+
+		return postDtos;
 	}
 
 }
